@@ -19,7 +19,6 @@ package net.frakbot.romainguymuzei;
 
 import android.content.Intent;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
@@ -28,11 +27,13 @@ import android.widget.Toast;
 import com.google.android.apps.muzei.api.Artwork;
 import com.google.android.apps.muzei.api.RemoteMuzeiArtSource;
 import com.google.android.apps.muzei.api.UserCommand;
+import net.frakbot.romainguymuzei.CuriousCreatureService.Photo;
+import net.frakbot.romainguymuzei.CuriousCreatureService.PhotosResponse;
 import retrofit.ErrorHandler;
 import retrofit.RequestInterceptor;
 import retrofit.RestAdapter;
 import retrofit.RetrofitError;
-import net.frakbot.romainguymuzei.CuriousCreatureService.*;
+import retrofit.client.Response;
 
 import java.util.List;
 import java.util.Random;
@@ -106,10 +107,13 @@ public class CuriousCreatureArtSource extends RemoteMuzeiArtSource {
             .setErrorHandler(new ErrorHandler() {
                 @Override
                 public Throwable handleError(RetrofitError retrofitError) {
-                    int statusCode = retrofitError.getResponse().getStatus();
-                    if (retrofitError.isNetworkError()
-                        || (500 <= statusCode && statusCode < 600)) {
-                        return new RetryException();
+                    final Response response = retrofitError.getResponse();
+                    if (response != null) {
+                        int statusCode = response.getStatus();
+                        if (retrofitError.isNetworkError()
+                            || (500 <= statusCode && statusCode < 600)) {
+                            return new RetryException();
+                        }
                     }
                     scheduleUpdate(System.currentTimeMillis() + ROTATE_TIME_MILLIS);
                     return retrofitError;
