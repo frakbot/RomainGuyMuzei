@@ -1,0 +1,64 @@
+apply plugin: 'android'
+
+dependencies {
+    compile 'com.google.android.apps.muzei:muzei-api:+'
+    compile 'com.squareup.retrofit:retrofit:1.3.0'
+}
+
+android {
+    compileSdkVersion 19
+    buildToolsVersion "19.0.1"
+
+    def Properties versionProps = new Properties()
+    versionProps.load(new FileInputStream(file('version.properties')))
+
+    defaultConfig {
+        minSdkVersion 17
+        targetSdkVersion 19
+
+        versionName versionProps['name']
+        versionCode versionProps['code'].toInteger()
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_7
+        targetCompatibility JavaVersion.VERSION_1_7
+    }
+
+    signingConfigs {
+        release {
+            def Properties localProps = new Properties()
+            localProps.load(new FileInputStream(file('../local.properties')))
+            def Properties keyProps = new Properties()
+            assert localProps['keystore.props.file'];
+            keyProps.load(new FileInputStream(file(localProps['keystore.props.file'])))
+            storeFile file(keyProps["store"])
+            keyAlias keyProps["alias"]
+            storePassword keyProps["storePass"]
+            keyPassword keyProps["pass"]
+        }
+    }
+
+    buildTypes {
+        release {
+            runProguard true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), file('proguard-rules.txt')
+            signingConfig signingConfigs.release
+        }
+
+        publicBeta.initWith(buildTypes.release)
+        publicBeta {
+            runProguard false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), file('proguard-rules.txt')
+            versionNameSuffix " " + versionProps['betaNumber']
+        }
+
+        publicDebug.initWith(buildTypes.publicBeta)
+        publicDebug {
+            debuggable true
+            runProguard true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), file('proguard-rules.txt')
+            versionNameSuffix " Debug " + versionProps['betaNumber']
+        }
+    }
+}

@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Romain Guy Muzei</string>
+    <string name="source_name">Romain Guy Flickr</string>
+    <string name="source_description">Wallpapers from Romain Guy\'s amazing photo stream</string>
+    <string name="share">Share photo</string>
+    <string name="source_error_no_artwork_to_share">No photo to share.</string>
+</resources>
