@@ -24,8 +24,8 @@ build/
 local.properties
 keystore.properties
 
-# Example files
-*.example
+# Configuration files
+Config.java
 
 # Windows thumbnail db
 .DS_Store
