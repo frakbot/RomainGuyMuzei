@@ -17,5 +17,5 @@
 package net.frakbot.romainguymuzei;
 
 public interface Config {
-    public static final String API_KEY = "ad212b1f3158adac0f66c945f0c8804e";
+    public static final String API_KEY = YOUR_FLICKR_API_KEY;
 }
