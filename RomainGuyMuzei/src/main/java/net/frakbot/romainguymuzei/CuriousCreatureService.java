@@ -1,241 +1,138 @@
-/*
- * Copyright 2014 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package net.frakbot.romainguymuzei;
 
-import com.google.gson.annotations.Expose;
-import retrofit.http.GET;
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.preference.PreferenceManager;
+import android.util.Log;
+import com.google.android.apps.muzei.api.RemoteMuzeiArtSource;
+import com.google.gson.Gson;
+import retrofit.ErrorHandler;
+import retrofit.RequestInterceptor;
+import retrofit.RestAdapter;
+import retrofit.RetrofitError;
+import retrofit.client.Response;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
-interface CuriousCreatureService {
-    @GET("/?method=flickr.people.getPublicPhotos&user_id=24046097%40N00&extras=url_o&format=json&nojsoncallback=1")
-    PhotosResponse getRomainsPhotos();
+public class CuriousCreatureService {
 
-    static class PhotosResponse {
+    public static final String TAG = CuriousCreatureService.class.getSimpleName();
+    public static final int BATCH_SIZE = 300;
+    public static final String PREF_KEY_PHOTOSTREAM = "photostream";
 
-        @Expose
-        Photos_ photos;
-        @Expose
-        String stat;
+    private final AtomicReference<RetrofitError> mLastError = new AtomicReference<>(null);
 
-        public Photos_ getPhotos() {
-            return photos;
-        }
-
-        public void setPhotos(Photos_ photos) {
-            this.photos = photos;
-        }
-
-        public String getStat() {
-            return stat;
-        }
-
-        public void setStat(String stat) {
-            this.stat = stat;
-        }
-
+    public RetrofitError getLastError() {
+        return mLastError.get();
     }
 
-    public class Photos_ {
+    public List<CuriousCreatureRESTClient.Photo> downloadPhotos() {
+        Log.i(TAG, "Downloading updated photostream data");
 
-        @Expose
-        Integer page;
-        @Expose
-        Integer pages;
-        @Expose
-        Integer perpage;
-        @Expose
-        String total;
-        @Expose
-        List<Photo> photo = new ArrayList<Photo>();
+        RestAdapter restAdapter = new RestAdapter.Builder()
+            .setServer("http://api.flickr.com/services/rest")
+            .setRequestInterceptor(new RequestInterceptor() {
+                @Override
+                public void intercept(RequestFacade request) {
+                    request.addQueryParam("api_key", Config.API_KEY);
+                }
+            })
+            .setErrorHandler(new ErrorHandler() {
+                @Override
+                public Throwable handleError(RetrofitError retrofitError) {
+                    final Response response = retrofitError.getResponse();
+                    if (response != null) {
+                        int statusCode = response.getStatus();
+                        if (retrofitError.isNetworkError() || (500 <= statusCode && statusCode < 600)) {
+                            return new RemoteMuzeiArtSource.RetryException();
+                        }
+                    }
+                    mLastError.set(retrofitError);
+                    return retrofitError;
+                }
+            })
+            .build();
 
-        public Integer getPage() {
-            return page;
-        }
+        mLastError.set(null);       // Clear last error before performing the request
 
-        public void setPage(Integer page) {
-            this.page = page;
-        }
+        if (BuildConfig.DEBUG) Log.v(TAG, "Initializing REST client");
+        CuriousCreatureRESTClient service = restAdapter.create(CuriousCreatureRESTClient.class);
 
-        public Integer getPages() {
-            return pages;
-        }
-
-        public void setPages(Integer pages) {
-            this.pages = pages;
-        }
-
-        public Integer getPerpage() {
-            return perpage;
-        }
-
-        public void setPerpage(Integer perpage) {
-            this.perpage = perpage;
-        }
-
-        public String getTotal() {
-            return total;
-        }
-
-        public void setTotal(String total) {
-            this.total = total;
-        }
-
-        public List<Photo> getPhoto() {
-            return photo;
-        }
-
-        public void setPhoto(List<Photo> photo) {
-            this.photo = photo;
-        }
-
+        if (BuildConfig.DEBUG) Log.v(TAG, "Downloading photos");
+        return getRomainsPhotos(service);
     }
 
-    static class Photo {
-
-        @Expose
-        String id;
-        @Expose
-        String owner;
-        @Expose
-        String secret;
-        @Expose
-        String server;
-        @Expose
-        Integer farm;
-        @Expose
-        String title;
-        @Expose
-        Integer ispublic;
-        @Expose
-        Integer isfriend;
-        @Expose
-        Integer isfamily;
-        @Expose
-        String url_o;
-        @Expose
-        String height_o;
-        @Expose
-        String width_o;
-
-        public String getId() {
-            return id;
+    /**
+     * Downloads all the information about Romain's photo stream from Flickr.
+     *
+     * @param service The REST client to use to retrieve the photos.
+     *
+     * @return The complete photo stream info.
+     */
+    private List<CuriousCreatureRESTClient.Photo> getRomainsPhotos(CuriousCreatureRESTClient service) {
+        // Get the first page (which is probably not the last) and also get metadata out of it
+        CuriousCreatureRESTClient.PhotosResponse response = service.getRomainsPhotos(1, 300);
+        if (response == null) {
+            Log.w(TAG, "Got an empty response from the server");
+            return null;
         }
 
-        public void setId(String id) {
-            this.id = id;
+        final CuriousCreatureRESTClient.Photos photos = response.getPhotos();
+        final List<CuriousCreatureRESTClient.Photo> photostream = photos.getPhotos();
+        if (BuildConfig.DEBUG) Log.v(TAG, "Total photos found: " + photos.getTotal() + "; batch size: " + BATCH_SIZE);
+
+        for (int page = photos.page + 1; page < photos.pages; page++) {
+            Log.d(TAG, "Downloading photos batch " + page + " out of " + photos.pages);
+            CuriousCreatureRESTClient.PhotosResponse tmpResponse = service.getRomainsPhotos(page, BATCH_SIZE);
+            photostream.addAll(tmpResponse.getPhotos().getPhotos());
         }
 
-        public String getOwner() {
-            return owner;
-        }
-
-        public void setOwner(String owner) {
-            this.owner = owner;
-        }
-
-        public String getSecret() {
-            return secret;
-        }
-
-        public void setSecret(String secret) {
-            this.secret = secret;
-        }
-
-        public String getServer() {
-            return server;
-        }
-
-        public void setServer(String server) {
-            this.server = server;
-        }
-
-        public Integer getFarm() {
-            return farm;
-        }
-
-        public void setFarm(Integer farm) {
-            this.farm = farm;
-        }
-
-        public String getTitle() {
-            return title;
-        }
-
-        public void setTitle(String title) {
-            this.title = title;
-        }
-
-        public Integer getIspublic() {
-            return ispublic;
-        }
-
-        public void setIspublic(Integer ispublic) {
-            this.ispublic = ispublic;
-        }
-
-        public Integer getIsfriend() {
-            return isfriend;
-        }
-
-        public void setIsfriend(Integer isfriend) {
-            this.isfriend = isfriend;
-        }
-
-        public Integer getIsfamily() {
-            return isfamily;
-        }
-
-        public void setIsfamily(Integer isfamily) {
-            this.isfamily = isfamily;
-        }
-
-        public String getUrl_o() {
-            return url_o;
-        }
-
-        public void setUrl_o(String url_o) {
-            this.url_o = url_o;
-        }
-
-        public String getHeight_o() {
-            return height_o;
-        }
-
-        public void setHeight_o(String height_o) {
-            this.height_o = height_o;
-        }
-
-        public String getWidth_o() {
-            return width_o;
-        }
-
-        public void setWidth_o(String width_o) {
-            this.width_o = width_o;
-        }
-
-        @Override
-        public String toString() {
-            return String.format("[\"%1$s\" - URL: %2$s]", title, url_o);
-        }
+        return photostream;
     }
 
-    static class User {
-        String fullname;
+    /**
+     * Persists a list of photos in the app's shared preferences,
+     * storing them as a JSON string.
+     *
+     * @param context The Context to get the preferences from
+     * @param photos  The photos metadata to be persisted
+     */
+    public static void persistPhotosList(Context context, List<CuriousCreatureRESTClient.Photo> photos) {
+        final Gson gson = new Gson();
+        final SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
+        sp.edit()
+          .putString(PREF_KEY_PHOTOSTREAM, gson.toJson(photos))
+          .commit();
+    }
+
+    /**
+     * Loads a list of photos from the app's shared preferences,
+     * where they should have been persisted as JSON.
+     *
+     * @param context The Context to get the preferences from
+     *
+     * @return Returns the read photos list, if any, or null
+     * if there has been any issue.
+     */
+    public static ArrayList<CuriousCreatureRESTClient.Photo> readSavedPhotosList(Context context) {
+        final Gson gson = new Gson();
+        final SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
+
+        final String json = sp.getString(PREF_KEY_PHOTOSTREAM, null);
+        if (json == null) {
+            return null;
+        }
+
+        ArrayList<CuriousCreatureRESTClient.Photo> list = null;
+        try {
+            //noinspection unchecked
+            list = gson.fromJson(json, ArrayList.class);
+        }
+        catch (Exception e) {
+            Log.e(TAG, "Unable to deserialize the photos list JSON:\n" + json, e);
+        }
+        return list;
     }
 }

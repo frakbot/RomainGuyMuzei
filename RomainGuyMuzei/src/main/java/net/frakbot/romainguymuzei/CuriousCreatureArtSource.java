@@ -27,13 +27,7 @@ import android.widget.Toast;
 import com.google.android.apps.muzei.api.Artwork;
 import com.google.android.apps.muzei.api.RemoteMuzeiArtSource;
 import com.google.android.apps.muzei.api.UserCommand;
-import net.frakbot.romainguymuzei.CuriousCreatureService.Photo;
-import net.frakbot.romainguymuzei.CuriousCreatureService.PhotosResponse;
-import retrofit.ErrorHandler;
-import retrofit.RequestInterceptor;
-import retrofit.RestAdapter;
-import retrofit.RetrofitError;
-import retrofit.client.Response;
+import net.frakbot.romainguymuzei.CuriousCreatureRESTClient.Photo;
 
 import java.util.List;
 import java.util.Random;
@@ -96,43 +90,23 @@ public class CuriousCreatureArtSource extends RemoteMuzeiArtSource {
     protected void onTryUpdate(int reason) throws RetryException {
         String currentToken = (getCurrentArtwork() != null) ? getCurrentArtwork().getToken() : null;
 
-        RestAdapter restAdapter = new RestAdapter.Builder()
-            .setServer("http://api.flickr.com/services/rest")
-            .setRequestInterceptor(new RequestInterceptor() {
-                @Override
-                public void intercept(RequestFacade request) {
-                    request.addQueryParam("api_key", Config.API_KEY);
-                }
-            })
-            .setErrorHandler(new ErrorHandler() {
-                @Override
-                public Throwable handleError(RetrofitError retrofitError) {
-                    final Response response = retrofitError.getResponse();
-                    if (response != null) {
-                        int statusCode = response.getStatus();
-                        if (retrofitError.isNetworkError()
-                            || (500 <= statusCode && statusCode < 600)) {
-                            return new RetryException();
-                        }
-                    }
-                    scheduleUpdate(System.currentTimeMillis() + ROTATE_TIME_MILLIS);
-                    return retrofitError;
-                }
-            })
-            .build();
+        final CuriousCreatureService downloader = new CuriousCreatureService();
+        List<Photo> response = downloader.downloadPhotos();
 
-        Log.i(TAG, "Updating photos list");
-        CuriousCreatureService service = restAdapter.create(CuriousCreatureService.class);
-        PhotosResponse response = service.getRomainsPhotos();
+        if (response == null) {
+            Log.w(TAG, "Error retrieving the photos list.");
 
-        if (response == null || response.photos == null) {
+            if (downloader.getLastError() != null) {
+                // Not a network error, not a 5xx HTTP error: retry, but in a while
+                scheduleUpdate(ROTATE_TIME_MILLIS);
+                return;
+            }
             throw new RetryException();
         }
 
-        final List<Photo> photosList = response.photos.getPhoto();
-        if (photosList.isEmpty()) {
+        if (response.isEmpty()) {
             Log.w(TAG, "No photos returned from API.");
-            scheduleUpdate(System.currentTimeMillis() + ROTATE_TIME_MILLIS);
+            scheduleUpdate(ROTATE_TIME_MILLIS);
             return;
         }
 
@@ -140,24 +114,30 @@ public class CuriousCreatureArtSource extends RemoteMuzeiArtSource {
         Photo photo;
         String token;
         while (true) {
-            photo = photosList.get(random.nextInt(photosList.size()));
-            token = photo.id;
-            if (photosList.size() <= 1 || !TextUtils.equals(token, currentToken)) {
+            photo = response.get(random.nextInt(response.size()));
+            token = photo.getId();
+            if (response.size() <= 1 || !TextUtils.equals(token, currentToken)) {
                 break;
             }
         }
 
         if (BuildConfig.DEBUG) Log.d(TAG, "Publishing artwork: " + photo);
         publishArtwork(new Artwork.Builder()
-                           .title(photo.title)
+                           .title(photo.getTitle())
                            .byline("Romain Guy")
-                           .imageUri(Uri.parse(photo.url_o))
+                           .imageUri(Uri.parse(photo.getUrl_o()))
                            .token(token)
                            .viewIntent(new Intent(Intent.ACTION_VIEW,
-                                                  Uri.parse("http://www.flickr.com/photos/24046097%40N00/" + photo.id)))
+                                                  Uri.parse(
+                                                      "http://www.flickr.com/photos/24046097%40N00/" + photo.getId())))
                            .build());
 
-        scheduleUpdate(System.currentTimeMillis() + ROTATE_TIME_MILLIS);
+        scheduleUpdate(ROTATE_TIME_MILLIS);
+    }
+
+    private void scheduleUpdate(int delayMs) {
+        Log.i(TAG, "Scheduling an update in " + delayMs + " ms");
+        scheduleUpdate(System.currentTimeMillis() + delayMs);
     }
 }
 
