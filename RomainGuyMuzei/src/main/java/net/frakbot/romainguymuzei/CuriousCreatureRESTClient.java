@@ -31,7 +31,7 @@ import java.util.List;
 public interface CuriousCreatureRESTClient {
 
     @GET("/?method=flickr.people.getPublicPhotos&user_id=24046097%40N00&extras=url_o&format=json&nojsoncallback=1")
-    public abstract PhotosResponse getRomainsPhotos(@Query("page") int page, @Query("perpage") int countPerPage);
+    public abstract PhotosResponse getRomainsPhotos(@Query("page") int page, @Query("per_page") int countPerPage);
 
     public static class PhotosResponse {
 
