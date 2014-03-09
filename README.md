@@ -15,10 +15,9 @@ one at random and downloads it at the highest possible resolution (hmmm, pixels.
 
 These things are slated for later releases:
 - Reduce the amount of requests to flickr by updating the photos list only once a day
-- Download the whole photoset, not only the last 100 photos (or the last 300, since Romain suggets so...)
 - Add a settings screen (update interval, select album, whatever)
 - Cache downloaded photos locally to save on bandwidth
-- Optionally only download new pics on Wi-Fi
+- Optionally only download new pics or update the photostream on Wi-Fi
 
 ## Download
 You can download **Romain Guy Muzei** from the Google Play Store:
