@@ -14,7 +14,6 @@ The app simply scraps the last 100 photos published on Romain's flickr account. 
 one at random and downloads it at the highest possible resolution (hmmm, pixels...).
 
 These things are slated for later releases:
-- Reduce the amount of requests to flickr by updating the photos list only once a day
 - Add a settings screen (update interval, select album, whatever)
 - Cache downloaded photos locally to save on bandwidth
 - Optionally only download new pics or update the photostream on Wi-Fi

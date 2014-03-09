@@ -29,6 +29,7 @@ import com.google.android.apps.muzei.api.RemoteMuzeiArtSource;
 import com.google.android.apps.muzei.api.UserCommand;
 import net.frakbot.romainguymuzei.CuriousCreatureRESTClient.Photo;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
@@ -89,50 +90,69 @@ public class CuriousCreatureArtSource extends RemoteMuzeiArtSource {
     @Override
     protected void onTryUpdate(int reason) throws RetryException {
         String currentToken = (getCurrentArtwork() != null) ? getCurrentArtwork().getToken() : null;
+        ArrayList<Photo> photoList;
 
-        final CuriousCreatureService downloader = new CuriousCreatureService();
-        List<Photo> response = downloader.downloadPhotos();
+        // Try to load the persisted photos list first (our local cache)
+        photoList = PhotosListLoader.readSavedPhotosListIfNotStale(this);
 
-        if (response == null) {
-            Log.w(TAG, "Error retrieving the photos list.");
+        if (photoList == null || photoList.isEmpty()) {
+            final PhotosListLoader downloader = new PhotosListLoader();
+            photoList = downloader.downloadPhotos();
 
-            if (downloader.getLastError() != null) {
-                // Not a network error, not a 5xx HTTP error: retry, but in a while
+            if (photoList == null) {
+                Log.w(TAG, "Error retrieving the photos list.");
+
+                if (downloader.getLastError() != null) {
+                    // Not a network error, not a 5xx HTTP error: retry, but in a while
+                    scheduleUpdate(ROTATE_TIME_MILLIS);
+                    return;
+                }
+                throw new RetryException();
+            }
+
+            if (photoList.isEmpty()) {
+                Log.w(TAG, "No photos returned from API.");
                 scheduleUpdate(ROTATE_TIME_MILLIS);
                 return;
             }
-            throw new RetryException();
-        }
 
-        if (response.isEmpty()) {
-            Log.w(TAG, "No photos returned from API.");
-            scheduleUpdate(ROTATE_TIME_MILLIS);
-            return;
+            // Cache the downloaded photos list
+            PhotosListLoader.persistPhotosList(this, photoList);
         }
-
-        Random random = new Random();
-        Photo photo;
-        String token;
-        while (true) {
-            photo = response.get(random.nextInt(response.size()));
-            token = photo.getId();
-            if (response.size() <= 1 || !TextUtils.equals(token, currentToken)) {
-                break;
+        else {
+            if (BuildConfig.DEBUG) {
+                Log.i(TAG, "Using photos list from local cache. Entries in cache: " +
+                           photoList.size());
             }
         }
+
+        Photo photo = selectRandomPhoto(currentToken, photoList);
 
         if (BuildConfig.DEBUG) Log.d(TAG, "Publishing artwork: " + photo);
         publishArtwork(new Artwork.Builder()
                            .title(photo.getTitle())
                            .byline("Romain Guy")
                            .imageUri(Uri.parse(photo.getUrl_o()))
-                           .token(token)
+                           .token(photo.getId())
                            .viewIntent(new Intent(Intent.ACTION_VIEW,
                                                   Uri.parse(
-                                                      "http://www.flickr.com/photos/24046097%40N00/" + photo.getId())))
+                                                      "http://www.flickr.com/photos/24046097%40N00/" + photo.getId())
+                           ))
                            .build());
 
         scheduleUpdate(ROTATE_TIME_MILLIS);
+    }
+
+    private static Photo selectRandomPhoto(String currentToken, List<Photo> photoList) {
+        Random random = new Random();
+        Photo photo;
+        while (true) {
+            photo = photoList.get(random.nextInt(photoList.size()));
+            if (photoList.size() <= 1 || !TextUtils.equals(photo.getId(), currentToken)) {
+                break;
+            }
+        }
+        return photo;
     }
 
     private void scheduleUpdate(int delayMs) {

@@ -25,6 +25,7 @@ import retrofit.http.GET;
 import retrofit.http.Path;
 import retrofit.http.Query;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -69,7 +70,7 @@ public interface CuriousCreatureRESTClient {
         @Expose
         private String total;
         @Expose
-        private List<Photo> photo = new ArrayList<Photo>();
+        private ArrayList<Photo> photo = new ArrayList<Photo>();
 
         public Integer getPage() {
             return page;
@@ -103,11 +104,11 @@ public interface CuriousCreatureRESTClient {
             this.total = total;
         }
 
-        public List<Photo> getPhotos() {
+        public ArrayList<Photo> getPhotos() {
             return photo;
         }
 
-        public void setPhotos(List<Photo> photos) {
+        public void setPhotos(ArrayList<Photo> photos) {
             this.photo = photos;
         }
 
@@ -239,6 +240,19 @@ public interface CuriousCreatureRESTClient {
         @Override
         public String toString() {
             return String.format("[\"%1$s\" - URL: %2$s]", title, url_o);
+        }
+    }
+
+    public static class PersistedPhotosList {
+
+        @Expose
+        public ArrayList<Photo> photos;
+
+        public PersistedPhotosList() {
+        }
+
+        public PersistedPhotosList(ArrayList<Photo> photos) {
+            this.photos = photos;
         }
     }
 

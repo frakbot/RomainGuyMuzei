@@ -6,6 +6,7 @@ import android.preference.PreferenceManager;
 import android.util.Log;
 import com.google.android.apps.muzei.api.RemoteMuzeiArtSource;
 import com.google.gson.Gson;
+import net.frakbot.romainguymuzei.CuriousCreatureRESTClient.*;
 import retrofit.ErrorHandler;
 import retrofit.RequestInterceptor;
 import retrofit.RestAdapter;
@@ -16,11 +17,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
-public class CuriousCreatureService {
+public class PhotosListLoader {
 
-    public static final String TAG = CuriousCreatureService.class.getSimpleName();
+    public static final String TAG = PhotosListLoader.class.getSimpleName();
     public static final int BATCH_SIZE = 300;
+
     public static final String PREF_KEY_PHOTOSTREAM = "photostream";
+    private static final String PREF_KEY_PHOTOSTREAM_SAVE_DATE = "photostream_save_date";
+
+    private static final long PHOTOSTREAM_CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours
 
     private final AtomicReference<RetrofitError> mLastError = new AtomicReference<>(null);
 
@@ -28,7 +33,7 @@ public class CuriousCreatureService {
         return mLastError.get();
     }
 
-    public List<CuriousCreatureRESTClient.Photo> downloadPhotos() {
+    public ArrayList<CuriousCreatureRESTClient.Photo> downloadPhotos() {
         Log.i(TAG, "Downloading updated photostream data");
 
         RestAdapter restAdapter = new RestAdapter.Builder()
@@ -71,23 +76,25 @@ public class CuriousCreatureService {
      *
      * @return The complete photo stream info.
      */
-    private List<CuriousCreatureRESTClient.Photo> getRomainsPhotos(CuriousCreatureRESTClient service) {
+    private ArrayList<Photo> getRomainsPhotos(CuriousCreatureRESTClient service) {
         // Get the first page (which is probably not the last) and also get metadata out of it
-        CuriousCreatureRESTClient.PhotosResponse response = service.getRomainsPhotos(1, 300);
+        PhotosResponse response = service.getRomainsPhotos(1, 300);
         if (response == null) {
             Log.w(TAG, "Got an empty response from the server");
             return null;
         }
 
-        final CuriousCreatureRESTClient.Photos photos = response.getPhotos();
-        final List<CuriousCreatureRESTClient.Photo> photostream = photos.getPhotos();
+        final Photos photos = response.getPhotos();
+        final ArrayList<Photo> photostream = photos.getPhotos();
         if (BuildConfig.DEBUG) Log.v(TAG, "Total photos found: " + photos.getTotal() + "; batch size: " + BATCH_SIZE);
 
-        for (int page = photos.page + 1; page < photos.pages; page++) {
+        for (int page = photos.page + 1; page <= photos.pages; page++) {
             Log.d(TAG, "Downloading photos batch " + page + " out of " + photos.pages);
-            CuriousCreatureRESTClient.PhotosResponse tmpResponse = service.getRomainsPhotos(page, BATCH_SIZE);
+            PhotosResponse tmpResponse = service.getRomainsPhotos(page, BATCH_SIZE);
             photostream.addAll(tmpResponse.getPhotos().getPhotos());
         }
+
+        if (BuildConfig.DEBUG) Log.v(TAG, "Photostream info downloaded. Photos: " + photostream.size());
 
         return photostream;
     }
@@ -99,11 +106,12 @@ public class CuriousCreatureService {
      * @param context The Context to get the preferences from
      * @param photos  The photos metadata to be persisted
      */
-    public static void persistPhotosList(Context context, List<CuriousCreatureRESTClient.Photo> photos) {
+    public static void persistPhotosList(Context context, ArrayList<Photo> photos) {
         final Gson gson = new Gson();
         final SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
         sp.edit()
-          .putString(PREF_KEY_PHOTOSTREAM, gson.toJson(photos))
+          .putString(PREF_KEY_PHOTOSTREAM, gson.toJson(new PersistedPhotosList(photos)))
+          .putLong(PREF_KEY_PHOTOSTREAM_SAVE_DATE, System.currentTimeMillis())
           .commit();
     }
 
@@ -116,7 +124,7 @@ public class CuriousCreatureService {
      * @return Returns the read photos list, if any, or null
      * if there has been any issue.
      */
-    public static ArrayList<CuriousCreatureRESTClient.Photo> readSavedPhotosList(Context context) {
+    public static ArrayList<Photo> readSavedPhotosList(Context context) {
         final Gson gson = new Gson();
         final SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
 
@@ -125,14 +133,48 @@ public class CuriousCreatureService {
             return null;
         }
 
-        ArrayList<CuriousCreatureRESTClient.Photo> list = null;
+        ArrayList<Photo> list = null;
         try {
-            //noinspection unchecked
-            list = gson.fromJson(json, ArrayList.class);
+            final PersistedPhotosList persistedList = gson.fromJson(json, PersistedPhotosList.class);
+            list = persistedList.photos;
         }
         catch (Exception e) {
             Log.e(TAG, "Unable to deserialize the photos list JSON:\n" + json, e);
         }
         return list;
+    }
+
+    /**
+     * Loads a list of photos from the app's shared preferences,
+     * where they should have been persisted as JSON, but only if
+     * the persisted list is not too old.
+     *
+     * @param context The Context to get the preferences from
+     *
+     * @return Returns the loaded photos list, or null if no saved
+     * photos list is available or if it's too old to be used.
+     * @see #PHOTOSTREAM_CACHE_MAX_AGE
+     * @see #readSavedPhotosList(android.content.Context)
+     */
+    public static ArrayList<Photo> readSavedPhotosListIfNotStale(Context context) {
+        final SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
+        long lastPersistTimestamp = sp.getLong(PREF_KEY_PHOTOSTREAM_SAVE_DATE, 0);
+        long persistCacheAge = System.currentTimeMillis() - lastPersistTimestamp;
+
+        if (persistCacheAge > PHOTOSTREAM_CACHE_MAX_AGE) {
+            Log.d(TAG, "Photostream cache is old; not using it anymore");
+            return null;
+        }
+
+        return readSavedPhotosList(context);
+    }
+
+    // Debug function
+    public static void clearParsistedCache(Context context) {
+        final SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
+        sp.edit()
+          .remove(PREF_KEY_PHOTOSTREAM)
+          .remove(PREF_KEY_PHOTOSTREAM_SAVE_DATE)
+          .commit();
     }
 }
