@@ -16,28 +16,36 @@
 
 package net.frakbot.romainguymuzei;
 
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.preference.PreferenceManager;
+import com.google.gson.Gson;
 import com.google.gson.annotations.Expose;
 import retrofit.http.GET;
+import retrofit.http.Path;
+import retrofit.http.Query;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 
-interface CuriousCreatureService {
+public interface CuriousCreatureRESTClient {
+
     @GET("/?method=flickr.people.getPublicPhotos&user_id=24046097%40N00&extras=url_o&format=json&nojsoncallback=1")
-    PhotosResponse getRomainsPhotos();
+    public abstract PhotosResponse getRomainsPhotos(@Query("page") int page, @Query("per_page") int countPerPage);
 
-    static class PhotosResponse {
+    public static class PhotosResponse {
 
         @Expose
-        Photos_ photos;
+        private Photos photos;
         @Expose
-        String stat;
+        private String stat;
 
-        public Photos_ getPhotos() {
+        public Photos getPhotos() {
             return photos;
         }
 
-        public void setPhotos(Photos_ photos) {
+        public void setPhotos(Photos photos) {
             this.photos = photos;
         }
 
@@ -51,18 +59,18 @@ interface CuriousCreatureService {
 
     }
 
-    public class Photos_ {
+    public class Photos {
 
         @Expose
         Integer page;
         @Expose
         Integer pages;
         @Expose
-        Integer perpage;
+        private Integer perpage;
         @Expose
-        String total;
+        private String total;
         @Expose
-        List<Photo> photo = new ArrayList<Photo>();
+        private ArrayList<Photo> photo = new ArrayList<Photo>();
 
         public Integer getPage() {
             return page;
@@ -96,42 +104,42 @@ interface CuriousCreatureService {
             this.total = total;
         }
 
-        public List<Photo> getPhoto() {
+        public ArrayList<Photo> getPhotos() {
             return photo;
         }
 
-        public void setPhoto(List<Photo> photo) {
-            this.photo = photo;
+        public void setPhotos(ArrayList<Photo> photos) {
+            this.photo = photos;
         }
 
     }
 
-    static class Photo {
+    public static class Photo {
 
         @Expose
-        String id;
+        private String id;
         @Expose
-        String owner;
+        private String owner;
         @Expose
-        String secret;
+        private String secret;
         @Expose
-        String server;
+        private String server;
         @Expose
-        Integer farm;
+        private Integer farm;
         @Expose
-        String title;
+        private String title;
         @Expose
-        Integer ispublic;
+        private Integer ispublic;
         @Expose
-        Integer isfriend;
+        private Integer isfriend;
         @Expose
-        Integer isfamily;
+        private Integer isfamily;
         @Expose
-        String url_o;
+        private String url_o;
         @Expose
-        String height_o;
+        private String height_o;
         @Expose
-        String width_o;
+        private String width_o;
 
         public String getId() {
             return id;
@@ -235,7 +243,29 @@ interface CuriousCreatureService {
         }
     }
 
-    static class User {
-        String fullname;
+    public static class PersistedPhotosList {
+
+        @Expose
+        public ArrayList<Photo> photos;
+
+        public PersistedPhotosList() {
+        }
+
+        public PersistedPhotosList(ArrayList<Photo> photos) {
+            this.photos = photos;
+        }
+    }
+
+    public static class User {
+
+        private String fullname;
+
+        public String getFullname() {
+            return fullname;
+        }
+
+        public void setFullname(String fullname) {
+            this.fullname = fullname;
+        }
     }
 }

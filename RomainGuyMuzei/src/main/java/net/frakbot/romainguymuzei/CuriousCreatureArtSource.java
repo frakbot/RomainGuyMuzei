@@ -19,7 +19,6 @@ package net.frakbot.romainguymuzei;
 
 import android.content.Intent;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
@@ -28,12 +27,9 @@ import android.widget.Toast;
 import com.google.android.apps.muzei.api.Artwork;
 import com.google.android.apps.muzei.api.RemoteMuzeiArtSource;
 import com.google.android.apps.muzei.api.UserCommand;
-import retrofit.ErrorHandler;
-import retrofit.RequestInterceptor;
-import retrofit.RestAdapter;
-import retrofit.RetrofitError;
-import net.frakbot.romainguymuzei.CuriousCreatureService.*;
+import net.frakbot.romainguymuzei.CuriousCreatureRESTClient.Photo;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
@@ -94,66 +90,74 @@ public class CuriousCreatureArtSource extends RemoteMuzeiArtSource {
     @Override
     protected void onTryUpdate(int reason) throws RetryException {
         String currentToken = (getCurrentArtwork() != null) ? getCurrentArtwork().getToken() : null;
+        ArrayList<Photo> photoList;
 
-        RestAdapter restAdapter = new RestAdapter.Builder()
-            .setServer("http://api.flickr.com/services/rest")
-            .setRequestInterceptor(new RequestInterceptor() {
-                @Override
-                public void intercept(RequestFacade request) {
-                    request.addQueryParam("api_key", Config.API_KEY);
+        // Try to load the persisted photos list first (our local cache)
+        photoList = PhotosListLoader.readSavedPhotosListIfNotStale(this);
+
+        if (photoList == null || photoList.isEmpty()) {
+            final PhotosListLoader downloader = new PhotosListLoader();
+            photoList = downloader.downloadPhotos();
+
+            if (photoList == null) {
+                Log.w(TAG, "Error retrieving the photos list.");
+
+                if (downloader.getLastError() != null) {
+                    // Not a network error, not a 5xx HTTP error: retry, but in a while
+                    scheduleUpdate(ROTATE_TIME_MILLIS);
+                    return;
                 }
-            })
-            .setErrorHandler(new ErrorHandler() {
-                @Override
-                public Throwable handleError(RetrofitError retrofitError) {
-                    int statusCode = retrofitError.getResponse().getStatus();
-                    if (retrofitError.isNetworkError()
-                        || (500 <= statusCode && statusCode < 600)) {
-                        return new RetryException();
-                    }
-                    scheduleUpdate(System.currentTimeMillis() + ROTATE_TIME_MILLIS);
-                    return retrofitError;
-                }
-            })
-            .build();
+                throw new RetryException();
+            }
 
-        Log.i(TAG, "Updating photos list");
-        CuriousCreatureService service = restAdapter.create(CuriousCreatureService.class);
-        PhotosResponse response = service.getRomainsPhotos();
+            if (photoList.isEmpty()) {
+                Log.w(TAG, "No photos returned from API.");
+                scheduleUpdate(ROTATE_TIME_MILLIS);
+                return;
+            }
 
-        if (response == null || response.photos == null) {
-            throw new RetryException();
+            // Cache the downloaded photos list
+            PhotosListLoader.persistPhotosList(this, photoList);
         }
-
-        final List<Photo> photosList = response.photos.getPhoto();
-        if (photosList.isEmpty()) {
-            Log.w(TAG, "No photos returned from API.");
-            scheduleUpdate(System.currentTimeMillis() + ROTATE_TIME_MILLIS);
-            return;
-        }
-
-        Random random = new Random();
-        Photo photo;
-        String token;
-        while (true) {
-            photo = photosList.get(random.nextInt(photosList.size()));
-            token = photo.id;
-            if (photosList.size() <= 1 || !TextUtils.equals(token, currentToken)) {
-                break;
+        else {
+            if (BuildConfig.DEBUG) {
+                Log.i(TAG, "Using photos list from local cache. Entries in cache: " +
+                           photoList.size());
             }
         }
 
+        Photo photo = selectRandomPhoto(currentToken, photoList);
+
         if (BuildConfig.DEBUG) Log.d(TAG, "Publishing artwork: " + photo);
         publishArtwork(new Artwork.Builder()
-                           .title(photo.title)
+                           .title(photo.getTitle())
                            .byline("Romain Guy")
-                           .imageUri(Uri.parse(photo.url_o))
-                           .token(token)
+                           .imageUri(Uri.parse(photo.getUrl_o()))
+                           .token(photo.getId())
                            .viewIntent(new Intent(Intent.ACTION_VIEW,
-                                                  Uri.parse("http://www.flickr.com/photos/24046097%40N00/" + photo.id)))
+                                                  Uri.parse(
+                                                      "http://www.flickr.com/photos/24046097%40N00/" + photo.getId())
+                           ))
                            .build());
 
-        scheduleUpdate(System.currentTimeMillis() + ROTATE_TIME_MILLIS);
+        scheduleUpdate(ROTATE_TIME_MILLIS);
+    }
+
+    private static Photo selectRandomPhoto(String currentToken, List<Photo> photoList) {
+        Random random = new Random();
+        Photo photo;
+        while (true) {
+            photo = photoList.get(random.nextInt(photoList.size()));
+            if (photoList.size() <= 1 || !TextUtils.equals(photo.getId(), currentToken)) {
+                break;
+            }
+        }
+        return photo;
+    }
+
+    private void scheduleUpdate(int delayMs) {
+        Log.i(TAG, "Scheduling an update in " + delayMs + " ms");
+        scheduleUpdate(System.currentTimeMillis() + delayMs);
     }
 }
 

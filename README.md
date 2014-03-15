@@ -1,7 +1,9 @@
 Romain Guy Muzei
 ================
 
-An artwork source for Roman Nurik's [muzei](http://muzei.co) that displays random pictures from
+![Icon](https://raw2.github.com/frakbot/RomainGuyMuzei/develop/res/drawable-xhdpi/ic_launcher.png)
+
+**Romain Guy Muzei** is An artwork source for Roman Nurik's [muzei](http://muzei.co) that displays random pictures from
 Romain Guy's [Flickr photostream](http://www.flickr.com/photos/romainguy/).
 
 Romain's photos are freely available for non-commercial projects (such as this one).
@@ -12,9 +14,14 @@ The app simply scraps the last 100 photos published on Romain's flickr account. 
 one at random and downloads it at the highest possible resolution (hmmm, pixels...).
 
 These things are slated for later releases:
-- Reduce the amount of requests to flickr by updating the photos list only once a day
-- Download the whole photoset, not only the last 100 photos
 - Add a settings screen (update interval, select album, whatever)
+- Cache downloaded photos locally to save on bandwidth
+- Optionally only download new pics or update the photostream on Wi-Fi
+
+## Download
+You can download **Romain Guy Muzei** from the Google Play Store:
+
+[![Google Play Store](https://developer.android.com/images/brand/en_generic_rgb_wo_60.png)](https://play.google.com/apps?p=net.frakbot.romainguymuzei)
 
 ## Attributions
 This app is based upon *Roman Nurik*'s *Muzei sample source app* and uses the Muzei API.
