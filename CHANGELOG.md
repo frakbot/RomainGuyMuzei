@@ -2,7 +2,7 @@ Changelog
 =========
 
 ### Version 1.1
-Released on ???
+Released on 15th March 2014
 
 - NEW: loads all the photos in Romain's photostream
 - NEW: updates the photos list only once a day, to save on network usage
