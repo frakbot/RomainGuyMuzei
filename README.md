@@ -1,7 +1,7 @@
 Romain Guy Muzei
 ================
 
-![Icon](https://raw2.github.com/frakbot/RomainGuyMuzei/develop/res/drawable-xhdpi/ic_launcher.png)
+![Icon](https://raw.githubusercontent.com/frakbot/RomainGuyMuzei/develop/RomainGuyMuzei/src/main/ic_launcher-web.png)
 
 **Romain Guy Muzei** is An artwork source for Roman Nurik's [muzei](http://muzei.co) that displays random pictures from
 Romain Guy's [Flickr photostream](http://www.flickr.com/photos/romainguy/).
