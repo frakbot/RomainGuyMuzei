@@ -1,13 +1,13 @@
-apply plugin: 'android'
+apply plugin: 'com.android.application'
 
 dependencies {
-    compile 'com.google.android.apps.muzei:muzei-api:+'
-    compile 'com.squareup.retrofit:retrofit:1.3.0'
+    compile 'com.google.android.apps.muzei:muzei-api:1.0'
+    compile 'com.squareup.retrofit:retrofit:1.6.1'
 }
 
 android {
     compileSdkVersion 19
-    buildToolsVersion "19.0.1"
+    buildToolsVersion '19.1.0'
 
     def Properties versionProps = new Properties()
     versionProps.load(new FileInputStream(file('version.properties')))
