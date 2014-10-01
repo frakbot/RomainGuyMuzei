@@ -39,7 +39,7 @@ public class PhotosListLoader {
         Log.i(TAG, "Downloading updated photostream data");
 
         RestAdapter restAdapter = new RestAdapter.Builder()
-            .setEndpoint("http://api.flickr.com/services/rest")
+            .setEndpoint("https://api.flickr.com/services/rest")
             .setRequestInterceptor(new RequestInterceptor() {
                 @Override
                 public void intercept(RequestFacade request) {
@@ -80,7 +80,14 @@ public class PhotosListLoader {
      */
     private ArrayList<Photo> getRomainsPhotos(CuriousCreatureRESTClient service) {
         // Get the first page (which is probably not the last) and also get metadata out of it
-        PhotosResponse response = service.getRomainsPhotos(1, 300);
+        PhotosResponse response;
+        try {
+            response = service.getRomainsPhotos(1, 300);
+        }
+        catch (RetrofitError e) {
+            Log.e(TAG, "Error while retrieving photos", e);
+            return null;
+        }
         if (response == null) {
             Log.w(TAG, "Got an empty response from the server");
             return null;

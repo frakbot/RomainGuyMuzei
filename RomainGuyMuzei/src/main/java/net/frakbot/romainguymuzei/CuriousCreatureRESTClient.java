@@ -16,18 +16,11 @@
 
 package net.frakbot.romainguymuzei;
 
-import android.content.Context;
-import android.content.SharedPreferences;
-import android.preference.PreferenceManager;
-import com.google.gson.Gson;
 import com.google.gson.annotations.Expose;
 import retrofit.http.GET;
-import retrofit.http.Path;
 import retrofit.http.Query;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.List;
 
 public interface CuriousCreatureRESTClient {
 
