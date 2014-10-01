@@ -6,7 +6,10 @@ import android.preference.PreferenceManager;
 import android.util.Log;
 import com.google.android.apps.muzei.api.RemoteMuzeiArtSource;
 import com.google.gson.Gson;
-import net.frakbot.romainguymuzei.CuriousCreatureRESTClient.*;
+import net.frakbot.romainguymuzei.CuriousCreatureRESTClient.PersistedPhotosList;
+import net.frakbot.romainguymuzei.CuriousCreatureRESTClient.Photo;
+import net.frakbot.romainguymuzei.CuriousCreatureRESTClient.Photos;
+import net.frakbot.romainguymuzei.CuriousCreatureRESTClient.PhotosResponse;
 import retrofit.ErrorHandler;
 import retrofit.RequestInterceptor;
 import retrofit.RestAdapter;
@@ -14,7 +17,6 @@ import retrofit.RetrofitError;
 import retrofit.client.Response;
 
 import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class PhotosListLoader {
@@ -37,7 +39,7 @@ public class PhotosListLoader {
         Log.i(TAG, "Downloading updated photostream data");
 
         RestAdapter restAdapter = new RestAdapter.Builder()
-            .setServer("http://api.flickr.com/services/rest")
+            .setEndpoint("http://api.flickr.com/services/rest")
             .setRequestInterceptor(new RequestInterceptor() {
                 @Override
                 public void intercept(RequestFacade request) {
