@@ -1,6 +1,11 @@
 Changelog
 =========
 
+### Version 1.2
+Released on 2nd October 2014
+- NEW: improved reliability of the code
+- FIX: crash due to Flickr API changes
+
 ### Version 1.1
 Released on 15th March 2014
 

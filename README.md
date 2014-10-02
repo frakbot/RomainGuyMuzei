@@ -15,7 +15,6 @@ one at random and downloads it at the highest possible resolution (hmmm, pixels.
 
 These things are slated for later releases:
 - Add a settings screen (update interval, select album, whatever)
-- Cache downloaded photos locally to save on bandwidth
 - Optionally only download new pics or update the photostream on Wi-Fi
 
 ## Download
